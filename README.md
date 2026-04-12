@@ -2,7 +2,7 @@
 
 > **QA Automation POC** · App Repository
 
-This is the **application repository** half of the Cross-Repository CI/CD Triggered Automation POC .  
+This is the **application repository** half of the Cross-Repository CI/CD Triggered Automation POC.  
 It contains a lightweight, fully self-contained task-management web app that serves as the System Under Test (SUT).
 
 ---
