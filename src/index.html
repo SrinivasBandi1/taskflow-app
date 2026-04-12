@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow Pro – Team Task Manager</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="site-header" id="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <span class="logo-text">TaskFlow <strong>Pro</strong></span>
+      </div>
+      <nav class="nav-links">
+        <a href="#" id="nav-dashboard" class="nav-link active">Dashboard</a>
+        <a href="#" id="nav-tasks"     class="nav-link">My Tasks</a>
+        <a href="#" id="nav-reports"   class="nav-link">Reports</a>
+      </nav>
+      <div class="user-pill" id="user-pill">
+        <span class="avatar">SR</span>
+        <span class="username" id="logged-in-user">Srinivas R.</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== HERO / STATS STRIP ===== -->
+  <section class="stats-strip" id="stats-strip">
+    <div class="stat-card" id="stat-total">
+      <span class="stat-number" id="stat-total-count">12</span>
+      <span class="stat-label">Total Tasks</span>
+    </div>
+    <div class="stat-card" id="stat-active">
+      <span class="stat-number" id="stat-active-count">5</span>
+      <span class="stat-label">In Progress</span>
+    </div>
+    <div class="stat-card" id="stat-completed">
+      <span class="stat-number" id="stat-completed-count">7</span>
+      <span class="stat-label">Completed</span>
+    </div>
+    <div class="stat-card" id="stat-overdue">
+      <span class="stat-number overdue" id="stat-overdue-count">2</span>
+      <span class="stat-label">Overdue</span>
+    </div>
+  </section>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="main-content">
+
+    <!-- ADD TASK FORM -->
+    <section class="card form-card" id="add-task-section">
+      <h2 class="card-title">Add New Task</h2>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="task-title">Task Title <span class="required">*</span></label>
+          <input
+            type="text"
+            id="task-title"
+            name="task-title"
+            placeholder="e.g. Fix login page bug"
+            autocomplete="off"
+            maxlength="80"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="task-assignee">Assignee</label>
+          <input
+            type="text"
+            id="task-assignee"
+            name="task-assignee"
+            placeholder="Team member name"
+            autocomplete="off"
+          />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="task-priority">Priority</label>
+          <select id="task-priority" name="task-priority">
+            <option value="">-- Select Priority --</option>
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="task-due-date">Due Date</label>
+          <input
+            type="date"
+            id="task-due-date"
+            name="task-due-date"
+          />
+        </div>
+      </div>
+
+      <div class="form-group full-width">
+        <label for="task-description">Description</label>
+        <textarea
+          id="task-description"
+          name="task-description"
+          placeholder="Optional: describe the task in detail..."
+          rows="3"
+        ></textarea>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" id="btn-add-task" class="btn btn-primary">
+          + Add Task
+        </button>
+        <button type="button" id="btn-clear-form" class="btn btn-secondary">
+          Clear
+        </button>
+      </div>
+
+      <!-- Success / Error Messages -->
+      <div id="form-message" class="form-message hidden" role="alert"></div>
+    </section>
+
+    <!-- SEARCH & FILTER BAR -->
+    <section class="filter-bar" id="filter-bar">
+      <input
+        type="text"
+        id="search-input"
+        placeholder="🔍 Search tasks..."
+        class="search-input"
+        autocomplete="off"
+      />
+      <div class="filter-buttons">
+        <button class="filter-btn active" data-filter="all"       id="filter-all">All</button>
+        <button class="filter-btn"        data-filter="in-progress" id="filter-inprogress">In Progress</button>
+        <button class="filter-btn"        data-filter="completed" id="filter-completed">Completed</button>
+        <button class="filter-btn"        data-filter="overdue"   id="filter-overdue">Overdue</button>
+      </div>
+    </section>
+
+    <!-- TASK LIST -->
+    <section class="card task-list-card" id="task-list-section">
+      <h2 class="card-title">Task Board</h2>
+      <div id="task-list" class="task-list">
+        <!-- Tasks injected by JS -->
+      </div>
+      <div id="empty-state" class="empty-state hidden">
+        <span>📭</span>
+        <p>No tasks found. Try a different filter or add a new task.</p>
+      </div>
+    </section>
+
+    <!-- TEAM ACTIVITY FEED -->
+    <section class="card activity-card" id="activity-section">
+      <h2 class="card-title">Recent Activity</h2>
+      <ul class="activity-feed" id="activity-feed">
+        <li class="activity-item" id="activity-1">
+          <span class="activity-dot green"></span>
+          <span class="activity-text">Srinivas R. completed <strong>Write unit tests for auth module</strong></span>
+          <span class="activity-time">2 min ago</span>
+        </li>
+        <li class="activity-item" id="activity-2">
+          <span class="activity-dot blue"></span>
+          <span class="activity-text">Priya K. added <strong>Design new dashboard layout</strong></span>
+          <span class="activity-time">15 min ago</span>
+        </li>
+        <li class="activity-item" id="activity-3">
+          <span class="activity-dot yellow"></span>
+          <span class="activity-text">Rahul M. updated priority of <strong>API rate limiting</strong> to Critical</span>
+          <span class="activity-time">1 hr ago</span>
+        </li>
+      </ul>
+    </section>
+
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="site-footer" id="site-footer">
+    <p>TaskFlow Pro &copy; 2025 — Internal Demo App for QA Automation POC</p>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
