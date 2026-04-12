@@ -1,0 +1,251 @@
+# ============================================================================
+# app-repo / .github/workflows/deploy-and-trigger-automation.yml
+#
+# PURPOSE:
+#   Simulates a real CI/CD pipeline for the application repo:
+#     1. Build the static site (or any app build step)
+#     2. Deploy to GitHub Pages (or a hosting environment)
+#     3. After successful deployment → trigger the automation repo
+#        via repository_dispatch so QA tests run automatically.
+#
+# TRIGGERS:
+#   - Push to main or develop branches
+#   - Manual dispatch (for demos)
+#
+# SECRETS REQUIRED (set in app-repo Settings → Secrets):
+#   AUTOMATION_TRIGGER_TOKEN  : GitHub PAT with repo scope for the automation repo
+#   AUTOMATION_REPO           : owner/repo-name of the automation repo
+#                               e.g. "myorg/taskflow-automation"
+# ============================================================================
+
+name: Build, Deploy & Trigger Automation
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - uat
+          - production
+      browser:
+        description: 'Browser for automation run'
+        required: false
+        default: 'chrome'
+        type: choice
+        options:
+          - chrome
+          - firefox
+          - edge
+
+# Prevents multiple concurrent runs for the same branch
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ==========================================================================
+  # JOB 1: BUILD
+  # Simulates compiling/packaging the application.
+  # For a static site this is minimal; for a real app add npm build, maven, etc.
+  # ==========================================================================
+  build:
+    name: 🔨 Build Application
+    runs-on: ubuntu-latest
+
+    outputs:
+      build-number: ${{ steps.set-build-number.outputs.build_number }}
+
+    steps:
+      - name: Checkout application source
+        uses: actions/checkout@v4
+
+      - name: Set build number
+        id: set-build-number
+        run: |
+          BUILD_NUMBER="${{ github.run_number }}"
+          echo "build_number=${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "Build number: ${BUILD_NUMBER}"
+
+      - name: Lint HTML (basic well-formedness check)
+        run: |
+          echo "Running basic lint checks on HTML..."
+          # For a real project: npx htmlhint src/index.html
+          # Here we do a quick sanity check
+          if grep -q "<!DOCTYPE html>" src/index.html; then
+            echo "✅ HTML DOCTYPE found"
+          else
+            echo "❌ Missing DOCTYPE" && exit 1
+          fi
+
+          if grep -q "<title>" src/index.html; then
+            echo "✅ HTML <title> tag found"
+          else
+            echo "❌ Missing <title> tag" && exit 1
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build-${{ steps.set-build-number.outputs.build_number }}
+          path: src/
+          retention-days: 7
+
+  # ==========================================================================
+  # JOB 2: DEPLOY
+  # Deploys the static site.  For the POC we deploy to GitHub Pages.
+  # For a real project: replace with kubectl apply, AWS S3 sync, etc.
+  # ==========================================================================
+  deploy:
+    name: 🚀 Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build
+
+    # Required permissions for GitHub Pages deployment
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    outputs:
+      app-url: ${{ steps.set-app-url.outputs.app_url }}
+      environment: ${{ steps.set-env.outputs.environment }}
+
+    steps:
+      - name: Checkout application source
+        uses: actions/checkout@v4
+
+      - name: Determine environment label
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            ENV="production"
+          else
+            ENV="staging"
+          fi
+          echo "environment=${ENV}" >> "$GITHUB_OUTPUT"
+          echo "Deploying to environment: ${ENV}"
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Prepare site for upload (move src/ to root)
+        run: |
+          mkdir -p _site
+          cp -r src/. _site/
+          echo "Site contents:"
+          ls -la _site/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Set app URL output
+        id: set-app-url
+        run: |
+          # GitHub Pages URL format: https://<owner>.github.io/<repo>/
+          APP_URL="${{ steps.deployment.outputs.page_url }}"
+          echo "app_url=${APP_URL}" >> "$GITHUB_OUTPUT"
+          echo "Application deployed to: ${APP_URL}"
+
+      - name: ✅ Deployment Summary
+        run: |
+          echo "================================================"
+          echo "  DEPLOYMENT SUCCESSFUL"
+          echo "  Environment  : ${{ steps.set-env.outputs.environment }}"
+          echo "  App URL      : ${{ steps.deployment.outputs.page_url }}"
+          echo "  Build Number : ${{ needs.build.outputs.build-number }}"
+          echo "  Commit SHA   : ${{ github.sha }}"
+          echo "  Triggered By : ${{ github.actor }}"
+          echo "================================================"
+
+  # ==========================================================================
+  # JOB 3: TRIGGER AUTOMATION
+  # After successful deployment, fires a repository_dispatch event to the
+  # automation repo, passing all context as the dispatch payload.
+  #
+  # The automation repo listens for event_type: "run-automation-tests"
+  # and reads the payload fields to configure the test run.
+  # ==========================================================================
+  trigger-automation:
+    name: 🤖 Trigger Automation Tests
+    runs-on: ubuntu-latest
+    needs: [build, deploy]
+
+    steps:
+      - name: Determine browser
+        id: browser
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BROWSER="${{ github.event.inputs.browser }}"
+          else
+            BROWSER="chrome"
+          fi
+          echo "browser=${BROWSER}" >> "$GITHUB_OUTPUT"
+
+      - name: 📡 Fire repository_dispatch to automation repo
+        uses: actions/github-script@v7
+        with:
+          # Uses the PAT stored in secrets — must have repo scope on automation repo
+          github-token: ${{ secrets.AUTOMATION_TRIGGER_TOKEN }}
+          script: |
+            const automationRepo = "${{ secrets.AUTOMATION_REPO }}";
+            const [owner, repo] = automationRepo.split("/");
+
+            const payload = {
+              env:           "${{ needs.deploy.outputs.environment }}",
+              app_url:       "${{ needs.deploy.outputs.app-url }}",
+              browser:       "${{ steps.browser.outputs.browser }}",
+              build_number:  "${{ needs.build.outputs.build-number }}",
+              triggered_by:  "${{ github.actor }}",
+              commit_sha:    "${{ github.sha }}",
+              branch:        "${{ github.ref_name }}"
+            };
+
+            console.log("Dispatching to:", owner + "/" + repo);
+            console.log("Payload:", JSON.stringify(payload, null, 2));
+
+            await github.rest.repos.createDispatchEvent({
+              owner,
+              repo,
+              event_type: "run-automation-tests",
+              client_payload: payload
+            });
+
+            console.log("✅ repository_dispatch sent successfully!");
+
+      - name: 📋 Trigger Summary
+        run: |
+          echo "================================================"
+          echo "  AUTOMATION TRIGGER SENT"
+          echo "  Target Repo  : ${{ secrets.AUTOMATION_REPO }}"
+          echo "  Event Type   : run-automation-tests"
+          echo "  App URL      : ${{ needs.deploy.outputs.app-url }}"
+          echo "  Environment  : ${{ needs.deploy.outputs.environment }}"
+          echo "  Browser      : ${{ steps.browser.outputs.browser }}"
+          echo "  Build Number : ${{ needs.build.outputs.build-number }}"
+          echo "  Triggered By : ${{ github.actor }}"
+          echo "================================================"
+          echo ""
+          echo "ℹ️  Check the automation repo's Actions tab for test results."
+          echo "   Repo: https://github.com/${{ secrets.AUTOMATION_REPO }}/actions"
