@@ -24,7 +24,7 @@ app-repo/
 
 ## The App: TaskFlow Pro
 
-A realistic-looking (but fully static) team task manager with:
+A realistic-looking (but fully static) team task manager with :
 
 | Region | What Selenium tests validate |
 |--------|------------------------------|
